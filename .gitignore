@@ -1,7 +1,10 @@
 **/.DS_Store
 
-data/*
-!data/epsd2.zip
+3_Data/**/*.csv
+3_Data/**/*.zip
+3_Data/.corpusdata
+3_Data/1_corpora
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
