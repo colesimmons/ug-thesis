@@ -1,9 +1,11 @@
 **/.DS_Store
 
+3_Data/**/*.json
+3_Data/**/*.jpg
 3_Data/**/*.csv
 3_Data/**/*.zip
-3_Data/.corpusdata
-3_Data/1_corpora
+3_Data/**/.corpusdata/
+3_Data/**/1_corpora/
 
 
 # Byte-compiled / optimized / DLL files

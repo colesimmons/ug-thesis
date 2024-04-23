@@ -68,6 +68,15 @@ if __name__ == "__main__":
     df.loc[df["period"].isin({"", "Uncertain"}), "period"] = "Unknown"
     df.loc[df["genre"].isin({"", "uncertain"}), "genre"] = "Unknown"
 
+    df.loc[df["genre"].isin({"Royal/Monumental", "Royal Inscription"}), "genre"] = (
+        "Royal Inscription"
+    )
+    df.loc[df["genre"].isin({"Lexical; School", "Lexical"}), "genre"] = "Lexical"
+    df.loc[df["genre"].isin({"Liturgy", "Ritual", "Hymn-Prayer"}), "genre"] = "Liturgy"
+    df.loc[
+        df["genre"].isin({"Mathematical", "Scientific", "Astronomical"}), "genre"
+    ] = "Math/Science"
+
     print(df["period"].value_counts())
     print()
     print(df["genre"].value_counts())

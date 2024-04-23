@@ -140,8 +140,7 @@ def _load_all_corpora():
     """
     Load all corpora from the ePSD2 data and save them to csv files.
     """
-    # for corpus_name in corpora_.list():
-    for corpus_name in ["oldbab_lit"]:
+    for corpus_name in corpora_.list():
         _load_epsd2_data_into_df(corpus_name)
 
 
