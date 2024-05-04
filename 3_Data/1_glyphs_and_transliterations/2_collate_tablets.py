@@ -41,6 +41,7 @@ if __name__ == "__main__":
     # language is "Sumerian" or ""
     print("Dropping rows that are not Sumerian...")
     df = df[df["language"].isin(["Sumerian", ""])]
+    df = df[~df["langs"].str.contains("akk")]
     df = df[df["period"] != "Ebla"]
     df = df[df["period"] != "fake"]
     df = df[df["period"] != "Pre-Uruk V"]
@@ -49,7 +50,7 @@ if __name__ == "__main__":
     print()
 
     # Print number of texts without transliteration
-    without_transliteration = df[df["transliteration"] == ""]
+    without_transliteration = df[df["transliteration"] == "==SURFACE=="]
     print("Dropping rows without transliteration...")
     df = df[df["transliteration"] != ""]
     print(f"Updated number of texts: {len(df)}")
@@ -62,7 +63,7 @@ if __name__ == "__main__":
     print()
 
     # Drop unnecessary columns
-    df = df[["id", "transliteration", "period", "genre", "subgenre"]]
+    df = df[["id", "transliteration", "period", "genre", "subgenre", "langs"]]
 
     # Standardize periods
     df.loc[df["period"].isin({"", "Uncertain"}), "period"] = "Unknown"

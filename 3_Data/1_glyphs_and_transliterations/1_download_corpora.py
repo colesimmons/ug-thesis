@@ -78,10 +78,11 @@ def _load_transliterations_and_convert_to_df(
             failed.append(text.file_id)
             continue
 
+        transliteration = text.transliteration()
         texts.append(
             {
                 "id": text.file_id,
-                "transliteration": text.transliteration(),
+                "transliteration": transliteration,
                 **text.model_dump(exclude={"cdl"}),
             }
         )
