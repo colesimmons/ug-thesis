@@ -1,20 +1,11 @@
 """
-This script uses the Oracc Sign List (OSL) data to create three JSON files:
+This script uses the Oracc Sign List (OSL) data to create two JSON files:
 
-1) `wordforms_to_glyph_names.json` str -> list[str]
-- This maps from wordforms to a set of the glyph names.
-- To see why this is useful, consider "lil₂",
-- which can be represented as either "KID" or "E₂".
-- If we are dealing with "{d}en-lil₂", wordforms_to_glyph_names tells us that
-  this wordform is composed of the glyphs ["AN", "EN", "KID"]
-  (correct order is coincidence),
-  which tells us that "lil₂" is written as "KID" in this context.
-
-2) `morpheme_to_glyph_names.json` str -> list[str]
+1) `morpheme_to_glyph_names.json` str -> list[str]
 - maps from an individual morpheme to a set of glyph names that could represent it.
 - e.g. "lil₂" -> ["AN", "E₂"]
 
-3) `glyph_name_to_glyph.json` str -> str
+2) `glyph_name_to_glyph.json` str -> str
 - This maps from glyph names to their Unicode representations or an empty string.
 
 This script does not rely on the previous scripts.
@@ -62,18 +53,6 @@ def download_osl_json():
 # ----------------------------- Process OSL JSON ---------------------------------------
 # --------------------------------------------------------------------------------------
 def process_json():
-    # ----------------------------------------
-    # ----- Wordform -> set(Glyph Names) -----
-    # ----------------------------------------
-    # e.g. e₂-a-ni-ša -> {E₂, AN, NI, ŠA}
-    wordform_to_glyph_names = defaultdict(set)
-
-    def _add_wordforms(*, glyph_name: str, wordforms: list[str]) -> None:
-        for form in wordforms:
-            form_base = form["sl:lemma"]["base"]
-            glyph_name = glyph_name.replace("&amp;", "&")
-            wordform_to_glyph_names[form_base].add(glyph_name)
-
     # ----------------------------------
     # -- Morpheme -> set(Glyph Names) --
     # ----------------------------------
@@ -107,9 +86,6 @@ def process_json():
             # Glyph Name -> Unicode
             glyph_unicode = glyph_data.get("sl:ucun", "")
             _add_glyph(glyph_name=glyph_name, unicode=glyph_unicode)
-            # Glyph Wordforms -> Glyph Name
-            glyph_wordforms = glyph_data.get("sl:lemmas", [])
-            _add_wordforms(glyph_name=glyph_name, wordforms=glyph_wordforms)
 
             for aka in glyph_data.get("j:aka", []):
                 aka_name = aka["sl:aka"]["n"]
@@ -122,9 +98,6 @@ def process_json():
                 # Morpheme -> Glyph Name
                 glyph_reading_data = glyph_reading_data["sl:v"]
                 _add_reading(glyph_name=glyph_name, reading=glyph_reading_data["n"])
-                # Wordform -> Glyph Name
-                reading_wordforms = glyph_reading_data.get("sl:lemmas", [])
-                _add_wordforms(glyph_name=glyph_name, wordforms=reading_wordforms)
 
             # Glyph Forms (variants, not to be confused with wordforms)
             for form in glyph_data.get("j:forms", []):
@@ -145,9 +118,6 @@ def process_json():
                     # Morpheme -> Form Name
                     form_reading_data = form_reading_data["sl:v"]
                     _add_reading(glyph_name=form_name, reading=form_reading_data["n"])
-                    # Wordform -> Form Name
-                    reading_lemmas = form_reading_data.get("sl:lemmas", [])
-                    _add_wordforms(glyph_name=form_name, wordforms=reading_lemmas)
 
     # ----------------------------------------
     # ---------- Postprocess -----------------
@@ -157,7 +127,6 @@ def process_json():
     def _remove_empty_strings(d: dict) -> dict:
         return {key: [v for v in vals if v != ""] for key, vals in d.items()}
 
-    wordform_to_glyph_names = _remove_empty_strings(wordform_to_glyph_names)
     morpheme_to_glyph_names = _remove_empty_strings(morpheme_to_glyph_names)
     glyph_name_to_glyphs = _remove_empty_strings(glyph_name_to_glyphs)
 
@@ -181,9 +150,6 @@ def process_json():
     # ----------------------------------------
     # --------------- Save -------------------
     # ----------------------------------------
-    with open("wordform_to_glyph_names.json", "w", encoding="utf-8") as f:
-        json.dump(wordform_to_glyph_names, f, ensure_ascii=False)
-
     with open("morpheme_to_glyph_names.json", "w", encoding="utf-8") as f:
         json.dump(morpheme_to_glyph_names, f, ensure_ascii=False)
 

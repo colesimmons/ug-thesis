@@ -1,6 +1,7 @@
 **/.DS_Store
 
 3_Data/**/*.json
+!3_Data/**/epsd2-sl.json
 3_Data/**/*.jpg
 3_Data/**/*.csv
 3_Data/**/*.zip

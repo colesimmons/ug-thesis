@@ -441,7 +441,7 @@ requests = "^2.31.0"
 type = "git"
 url = "https://github.com/colesimmons/sumeripy.git"
 reference = "HEAD"
-resolved_reference = "af8f2d7d5e9d5a86b002a4b07d1f7baed0aa290b"
+resolved_reference = "3d4e4f84ff558aa1c51c450b22c1b67506b8df0d"
 
 [[package]]
 name = "tqdm"
