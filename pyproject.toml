@@ -10,6 +10,8 @@ python = "^3.12"
 pandas = "^2.2.2"
 tqdm = "^4.66.2"
 sumeripy = {git = "https://github.com/colesimmons/sumeripy.git"}
+b2sdk = "^2.1.0"
+ipykernel = "^6.29.4"
 
 
 [build-system]
