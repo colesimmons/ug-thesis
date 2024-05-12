@@ -1,12 +1,12 @@
 """
 This script uses the Oracc Sign List (OSL) data to create two JSON files:
 
-1) `morpheme_to_glyph_names.json` str -> list[str]
+1) `./outputs/morpheme_to_glyph_names.json` str -> list[str]
 - maps from an individual morpheme to a set of glyph names that could represent it.
 - e.g. "lil₂" -> ["AN", "E₂"]
 
-2) `glyph_name_to_glyph.json` str -> str
-- This maps from glyph names to their Unicode representations or an empty string.
+2) `./outputs/glyph_name_to_glyph.json` str -> str
+- maps from glyph names to their Unicode representations or an empty string.
 
 This script does not rely on the previous scripts.
 It will be essential for turning the readings into glyph names / Unicode.
@@ -17,12 +17,43 @@ import os
 from collections import defaultdict
 
 import requests
+from constants import OUTPUT_DIR
+
+MORPHEME_TO_GLYPH_NAMES_OUTFILE = f"{OUTPUT_DIR}/morpheme_to_glyph_names.json"
+GLYPH_NAME_TO_GLYPH_OUTFILE = f"{OUTPUT_DIR}/glyph_name_to_glyph.json"
+
+with open("epsd2-sl.json", encoding="utf-8") as infile:
+    EPSD2_SL = json.load(infile)["index"]
+
+
+def main():
+    _download_osl_json()
+    morpheme_to_glyph_names, glyph_name_to_glyphs = _process_json()
+    morpheme_to_glyph_names = _remove_empty_strings(morpheme_to_glyph_names)
+    glyph_name_to_glyphs = _remove_empty_strings(glyph_name_to_glyphs)
+
+    # Add EPSD2_SL mappings to morpheme_to_glyph_names and write.
+    for k, v in EPSD2_SL.items():
+        morpheme_to_glyph_names[k] = [v]
+    with open(MORPHEME_TO_GLYPH_NAMES_OUTFILE, "w", encoding="utf-8") as f:
+        json.dump(morpheme_to_glyph_names, f, ensure_ascii=False)
+
+    # Each glyph name should map to at most one unicode representation.
+    # Double check, convert to a single mapping, and write.
+    for glyph_name, unicodes in glyph_name_to_glyphs.items():
+        if len(unicodes) > 1:
+            print(f"Glyph {glyph_name} has more than one representation: {unicodes}")
+    glyph_name_to_glyph = {
+        key: vals[0] if vals else "" for key, vals in glyph_name_to_glyphs.items()
+    }
+    with open(GLYPH_NAME_TO_GLYPH_OUTFILE, "w", encoding="utf-8") as f:
+        json.dump(glyph_name_to_glyph, f, ensure_ascii=False)
 
 
 # --------------------------------------------------------------------------------------
 # ---------------------------- Download OSL JSON ---------------------------------------
 # --------------------------------------------------------------------------------------
-def download_osl_json():
+def _download_osl_json():
     # Saved a copy at
     # https://drive.google.com/file/d/1qArSHeGsCHc3Fq6gdZiBLIvvObB5cIrU/view?usp=drive_link
     url = "https://oracc.museum.upenn.edu/osl/downloads/sl.json"
@@ -52,7 +83,7 @@ def download_osl_json():
 # --------------------------------------------------------------------------------------
 # ----------------------------- Process OSL JSON ---------------------------------------
 # --------------------------------------------------------------------------------------
-def process_json():
+def _process_json():
     # ----------------------------------
     # -- Morpheme -> set(Glyph Names) --
     # ----------------------------------
@@ -77,9 +108,9 @@ def process_json():
     # ---------- Process json ----------------
     # ----------------------------------------
     with open("osl.json") as f:
-        data = json.load(f)
+        osl = json.load(f)
 
-    for letter in data["sl:signlist"]["j:letters"]:
+    for letter in osl["sl:signlist"]["j:letters"]:
         for glyph in letter["sl:letter"]["j:signs"]:
             glyph_data = glyph["sl:sign"]
             glyph_name = glyph_data["n"]
@@ -119,44 +150,12 @@ def process_json():
                     form_reading_data = form_reading_data["sl:v"]
                     _add_reading(glyph_name=form_name, reading=form_reading_data["n"])
 
-    # ----------------------------------------
-    # ---------- Postprocess -----------------
-    # ----------------------------------------
-    #
-    # 1) Convert sets to lists and remove empty strings
-    def _remove_empty_strings(d: dict) -> dict:
-        return {key: [v for v in vals if v != ""] for key, vals in d.items()}
+    return morpheme_to_glyph_names, glyph_name_to_glyphs
 
-    morpheme_to_glyph_names = _remove_empty_strings(morpheme_to_glyph_names)
-    glyph_name_to_glyphs = _remove_empty_strings(glyph_name_to_glyphs)
 
-    # 2) For every morpheme that has multiple glyph names,
-    #    add a new entry for each of the glyph names.
-    #    e.g. if "lil₂": ["AN", "E₂"], we add "lil₂(AN)" and "lil₂(E₂)"
-    with open("epsd2-sl.json", encoding="utf-8") as infile:
-        to_add = json.load(infile)["index"]
-        for k, v in to_add.items():
-            morpheme_to_glyph_names[k] = [v]
-
-    # 3) Each glyph name should map to at most one unicode representation.
-    #    Double check, then convert the lists to strings.
-    for glyph_name, unicodes in glyph_name_to_glyphs.items():
-        if len(unicodes) > 1:
-            print(glyph_name, unicodes)
-    glyph_name_to_glyph = {
-        key: vals[0] if vals else "" for key, vals in glyph_name_to_glyphs.items()
-    }
-
-    # ----------------------------------------
-    # --------------- Save -------------------
-    # ----------------------------------------
-    with open("morpheme_to_glyph_names.json", "w", encoding="utf-8") as f:
-        json.dump(morpheme_to_glyph_names, f, ensure_ascii=False)
-
-    with open("glyph_name_to_glyph.json", "w", encoding="utf-8") as f:
-        json.dump(glyph_name_to_glyph, f, ensure_ascii=False)
+def _remove_empty_strings(d: dict) -> dict:
+    return {key: [v for v in vals if v != ""] for key, vals in d.items()}
 
 
 if __name__ == "__main__":
-    download_osl_json()
-    process_json()
+    main()

@@ -1,30 +1,32 @@
 """
 This script:
 - takes the dataframes from step 1
-- drops rows that are definitely not Sumerian
+- concatenates them into single dataframe
+- drops rows that are not Sumerian
 - drops rows w/o transliteration
-- drops excess columns (only keep id, transliteration, period, genre, and subgenre)
-- standardizes unknown periods and genres
-- saves result to a csv file
+- drops excess columns (only keep id, transliteration, period, and genre)
+- standardizes periods and genres
+- saves result to ./outputs/2_tablets.csv
 """
 
 import pandas as pd
+from constants import OUTPUT_DIR
 from sumeripy import corpora as corpora_
 from tqdm import tqdm
 
 tqdm.pandas()
 
-INPUT_DIR = "1_corpora"
-OUTFILE = "2_tablets.csv"
+OUTFILE = f"{OUTPUT_DIR}/2_tablets.csv"
 
 
 def _load_corpus(corpus_name):
     return pd.read_csv(
-        f"{INPUT_DIR}/{corpus_name}.csv",
+        f"{OUTPUT_DIR}/1_{corpus_name}.csv",
+        low_memory=False,
     ).fillna("")
 
 
-if __name__ == "__main__":
+def main():
     df = None
 
     for corpus_name in corpora_.list():
@@ -50,7 +52,6 @@ if __name__ == "__main__":
     print()
 
     # Print number of texts without transliteration
-    without_transliteration = df[df["transliteration"] == "==SURFACE=="]
     print("Dropping rows without transliteration...")
     df = df[df["transliteration"] != ""]
     print(f"Updated number of texts: {len(df)}")
@@ -63,12 +64,13 @@ if __name__ == "__main__":
     print()
 
     # Drop unnecessary columns
-    df = df[["id", "transliteration", "period", "genre", "subgenre", "langs"]]
+    df = df[["id", "transliteration", "period", "genre"]]
 
     # Standardize periods
     df.loc[df["period"].isin({"", "Uncertain"}), "period"] = "Unknown"
-    df.loc[df["genre"].isin({"", "uncertain"}), "genre"] = "Unknown"
 
+    # Standardize genres
+    df.loc[df["genre"].isin({"", "uncertain"}), "genre"] = "Unknown"
     df.loc[df["genre"].isin({"Royal/Monumental", "Royal Inscription"}), "genre"] = (
         "Royal Inscription"
     )
@@ -87,3 +89,7 @@ if __name__ == "__main__":
     df.to_csv(OUTFILE, index=False)
     print()
     print("Done!")
+
+
+if __name__ == "__main__":
+    main()

@@ -5,17 +5,16 @@ This script:
     - Loads the metadata for each tablet from the catalogue.json file
     - Generates a transliteration for each tablet from its particular JSON file
     - Formats the data into a DataFrame, where each row is a tablet
-    - Saves the DataFrame to a csv file: {OUTPUT_DIR}/{corpus_name}.csv
+    - Saves the DataFrame to a csv file: {OUTPUT_DIR}/1_{corpus_name}.csv
 """
 
 import os
 from typing import Optional
 
 import pandas as pd
+from constants import OUTPUT_DIR
 from sumeripy import corpora as corpora_
 from tqdm import tqdm
-
-OUTPUT_DIR = "1_corpora"
 
 
 def _download_corpus_json_from_epsd2(
@@ -116,13 +115,7 @@ def _load_epsd2_data_into_df(corpus_name: str) -> Optional[pd.DataFrame]:
     """
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    path = f"{OUTPUT_DIR}/{corpus_name}.csv"
-
-    # Check if file already exists in dir
-    # try:
-    # return pd.read_csv(path).fillna("")
-    # except FileNotFoundError:
-    # pass
+    path = f"{OUTPUT_DIR}/1_{corpus_name}.csv"
 
     # If it doesn't, download it
     corpus = _download_corpus_json_from_epsd2(corpus_name)
@@ -133,11 +126,12 @@ def _load_epsd2_data_into_df(corpus_name: str) -> Optional[pd.DataFrame]:
         return None
 
     # Save the DataFrame to a csv file
+    print(f"Writing to {path}")
     df.to_csv(path)
     return df
 
 
-def _load_all_corpora():
+def main():
     """
     Load all corpora from the ePSD2 data and save them to csv files.
     """
@@ -146,4 +140,4 @@ def _load_all_corpora():
 
 
 if __name__ == "__main__":
-    _load_all_corpora()
+    main()
