@@ -510,7 +510,7 @@ def _standalone_parens(row: pd.Series) -> pd.Series:
 
     https://oracc.museum.upenn.edu/doc/help/editinginatf/primer/inlinetutorial/index.html
     """
-    matches = re.findall(r"(?:^|\n|\ |\-)(\([^\n\)]+\))(?:^|\n|\ )", row[KEY])
+    matches = re.findall(r"(?:^|\n|\ |\-)(\([^\n\)]+\))(?:$|\n|\ |\-)", row[KEY])
     for match in matches:
         print(">> ", match, f" ({row['id']})")
         row[KEY] = row[KEY].replace(match, "")

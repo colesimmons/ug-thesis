@@ -253,22 +253,8 @@ def main():
         for k, v in replacements.items():
             df["transliteration"] = df["transliteration"].str.replace(k, v, regex=False)
 
-    # (1) Glyph names
-    df = _add_glyph_names(df)
-    _print_reading_to_glyph_name_stats()  # how successful?
-
-    # Replace a few more glyph names with more standard equivalents
-    for before, after in {
-        " UN": " KALAM@g",
-        "ŠITA₂": "|ŠITA.GIŠ|",
-        "|ŠU₂.3xAN|": "|ŠU₂.3×AN|",
-        "DE₂": "|UMUM×KASKAL|",
-    }.items():
-        for key in ["transliteration", "glyph_names"]:
-            df[key] = df[key].str.replace(before, after, regex=False)
-
-    # (2) Glyphs
     df = _add_glyphs(df)
+    _print_reading_to_glyph_name_stats()  # how successful?
     _print_glyph_name_to_unicode_stats()  # how successful?
 
     # (3) Postprocessing
@@ -277,11 +263,17 @@ def main():
     )
     df["transliteration"] = df["transliteration"].str.replace("-{", "{", regex=False)
     df["transliteration"] = df["transliteration"].str.replace("}-", "}", regex=False)
+    df["transliteration"] = df["transliteration"].str.replace(
+        "<unk>-", "<unk> ", regex=False
+    )
+    df["transliteration"] = df["transliteration"].str.replace(
+        "-<unk>", " <unk>", regex=False
+    )
 
     for key in ["transliteration", "glyph_names", "glyphs"]:
         df[key] = df[key].str.replace(r"(\ *\.{3,} *)+", "...", regex=True)
 
-    df["glyphs"] = df["glyphs"].str.replace("X", "<unk>", regex=False)
+    df["glyphs"] = df["glyphs"].str.replace(" ", "", regex=False)
 
     # Reorganize rows
     df = df[
@@ -302,54 +294,104 @@ def main():
     _write(df, separate_genre_files=True)
 
 
-# --------------------------------------------------------------------------------------
-# --------------------------- Glyph Names  ---------------------------------------------
-# --------------------------------------------------------------------------------------
-def _add_glyph_names(df: pd.DataFrame) -> pd.DataFrame:
+def _add_glyphs(df: pd.DataFrame) -> pd.DataFrame:
     print()
-    print("Adding glyph names...")
-    df = df.progress_apply(_add_glyph_names_to_row, axis=1)
+    print("Adding glyphs...")
+    df = df.progress_apply(_add_glyphs_to_row, axis=1)
     print("Done!")
     return df
 
 
-def _add_glyph_names_to_row(row: pd.Series) -> pd.Series:
+def _add_glyphs_to_row(row: pd.Series) -> pd.Series:
     text = row["transliteration"]
 
-    # Get it ready for tokenization
+    # (1) Get it ready for tokenization
     # --------------------------------
     text = text.replace("\n", " \n ")
     text = text.replace("...", " ... ")
     text = re.sub(r"\ +", " ", text)
 
-    wordforms = [wf for wf in text.split(" ") if wf]
-    wordforms = [wf for wf in wordforms if wf != "|" and wf != ".|"]
+    # (2) Split into wordforms (e.g. lugal-la-ka)
+    # --------------------------------
+    wordforms = [wf for wf in text.split(" ") if wf and wf != "|" and wf != ".|"]
 
-    wfs_and_glyph_names = [_get_wordform_glyph_names(wf) for wf in wordforms]
-    wfs_and_glyph_names = [wf for wf in wfs_and_glyph_names if wf[1] != ["N"]]
+    # (3) Get glyph names
+    # --------------------------------
+    transliteration = ""
+    glyph_names = ""
+    glyphs = ""
 
-    wfs = [wf for wf, _ in wfs_and_glyph_names]
-    glyph_names = [" ".join(names) for _, names in wfs_and_glyph_names]
-    row["transliteration"] = " ".join(wfs)
-    row["glyph_names"] = " ".join(glyph_names)
+    for wordform in wordforms:
+        data = _get_wordform_glyph_data(wordform)  # [(morpheme, glyph_name, glyph), ]
+        transliteration += "-".join([morpheme for morpheme, _, _ in data]) + " "
+        glyph_names += " ".join([glyph_name for _, glyph_name, _ in data]) + " "
+        glyphs += "".join([glyph for _, _, glyph in data]) + " "
+
+    row["transliteration"] = transliteration.strip()
+    row["glyph_names"] = glyph_names.strip()
+    row["glyphs"] = glyphs.strip()
     return row
 
 
-# -------------------------------------------------------------
-# ------------------ (1.1) WORDFORMS --------------------------
-# -------------------------------------------------------------
-# Do this here because we want to keep the numbers in the translit
-def _get_wordform_glyph_names(wf: str) -> tuple[str, list[str]]:
-    """
-    Params:
-    - wf (str): a wordform
+# --------------------------------------------------------------------------------------
+# --------------------------- Glyph Names  ---------------------------------------------
+# --------------------------------------------------------------------------------------
+SWAP_GLYPH_NAMES = {
+    "UN": "KALAM@g",
+    "ŠITA₂": "|ŠITA.GIŠ|",
+    "DE₂": "|UMUM×KASKAL|",
+    "|ŠU₂.3xAN|": "|ŠU₂.3×AN|",
+    "|ŠU₂.DUN₃@g@g@s|": "|ŠU₂.DUN₃|",
+    "LAK212": "|A.TU.GABA.LIŠ|",
+}
 
-    Returns:
-    - tuple of: updated wordform (str), list of glyph names (list[str])
-    """
-    if wf in SPECIAL_TOKENS:
-        return wf, [wf]
 
+def _get_wordform_glyph_data(wordform: str) -> list[tuple[str, str, str]]:
+    if wordform in SPECIAL_TOKENS:
+        return [(wordform, wordform, wordform)]
+
+    # Break wordform into morphemes
+    morphemes: list[str] = _split_wordform_into_morphemes(wordform)
+
+    # Get possible glyph names for each morpheme
+    morphemes_and_possible_glyph_names: list[tuple[str, list[str]]] = [
+        _get_morpheme_glyph_names(m) for m in morphemes
+    ]
+
+    # Only accept morphemes with exactly one glyph name
+    morphemes_and_glyph_names: list[tuple[str, str]] = []
+    for morpheme, possible_glyph_names in morphemes_and_possible_glyph_names:
+        glyph_name = UNK if len(possible_glyph_names) != 1 else possible_glyph_names[0]
+        morpheme = UNK if glyph_name == UNK else morpheme
+        morphemes_and_glyph_names.append((morpheme, glyph_name))
+
+        if glyph_name == UNK:
+            unk_readings_all.append(morpheme)
+        else:
+            non_unk_readings_all.append(morpheme)
+
+    # Now get the glyphs
+    morphemes_glyph_names_and_glyphs: list[tuple[str, str, str]] = []
+    for morpheme, glyph_name in morphemes_and_glyph_names:
+        if glyph_name == "N":
+            continue
+
+        if glyph_name in SWAP_GLYPH_NAMES:
+            glyph_name = SWAP_GLYPH_NAMES[glyph_name]
+
+        if morpheme == UNK:
+            morphemes_glyph_names_and_glyphs.append((UNK, UNK, UNK))
+        else:
+            unicode = _glyph_name_to_unicode(glyph_name)
+            if unicode == UNK or "X" in unicode:
+                morphemes_glyph_names_and_glyphs.append((UNK, UNK, UNK))
+            else:
+                morphemes_glyph_names_and_glyphs.append((morpheme, glyph_name, unicode))
+
+    return morphemes_glyph_names_and_glyphs
+
+
+def _split_wordform_into_morphemes(wf: str) -> list[str]:
     if wf in NUMBERS_TO_READINGS:
         wf_ = NUMBERS_TO_READINGS[wf]
     elif wf.split("-", 1)[0] in NUMBERS_TO_READINGS:
@@ -359,26 +401,8 @@ def _get_wordform_glyph_names(wf: str) -> tuple[str, list[str]]:
     else:
         wf_ = wf
 
-    morphemes = _split_wordform_into_morphemes(wf_)
-    morphemes_and_possible_glyph_names = [
-        _get_morpheme_glyph_names(m) for m in morphemes
-    ]
-
-    glyph_names = []
-    for morpheme, possible_glyph_names in morphemes_and_possible_glyph_names:
-        if len(possible_glyph_names) != 1:
-            unk_readings_all.append(morpheme)
-            glyph_names.append(UNK)
-        else:
-            non_unk_readings_all.append(morpheme)
-            glyph_names.append(possible_glyph_names[0])
-
-    return wf, glyph_names
-
-
-def _split_wordform_into_morphemes(wf: str) -> list[str]:
     # uri₅{ki} -> [uri₅, {ki}]
-    split_ = re.split(r"(\{.*?\})", wf)
+    split_ = re.split(r"(\{.*?\})", wf_)
 
     # Split on space, which should only happen if it
     # is one of the number replacements below
@@ -391,15 +415,12 @@ def _split_wordform_into_morphemes(wf: str) -> list[str]:
 
     # split and reverse any morphemes with colons
     # e.g. "mu-lu:gal-e" -> ["mu", "gal", "lu", "e"]
-    split_ = [s.split(":")[::-1] if ":" in s else [s] for s in split_ if s]
-    split_ = [s for sublist in split_ for s in sublist if s]  # Flatten
+    # split_ = [s.split(":")[::-1] if ":" in s else [s] for s in split_ if s]
+    # split_ = [s for sublist in split_ for s in sublist if s]  # Flatten
 
     return [s for s in split_ if s]
 
 
-# -------------------------------------------------------------
-# --------------- (1.2) MORPHEMES -----------------------------
-# -------------------------------------------------------------
 NUMERIC_PATTERN = re.compile(r"^\d+(/\d+)?(\.\d+)?(\s*\([^)]+\))?$")
 
 
@@ -418,12 +439,10 @@ def _get_morpheme_glyph_names(morpheme: str) -> tuple[str, list[str]]:
     if morpheme in GLYPH_NAMES:
         return UNK, [morpheme]
 
-    # {ki} -> ki
-    morpheme = morpheme.replace("{", "").replace("}", "")
-
     # layup
-    if morpheme in READING_TO_GLYPH_NAME:
-        return morpheme, READING_TO_GLYPH_NAME[morpheme]
+    morpheme_ = morpheme.replace("{", "").replace("}", "")  # {ki} -> ki
+    if morpheme_ in READING_TO_GLYPH_NAME:
+        return morpheme, READING_TO_GLYPH_NAME[morpheme_]
 
     # Sign name but that sign is not in the list.
     # But since sign names are based on a valid reading,
@@ -461,7 +480,6 @@ def _get_morpheme_glyph_names(morpheme: str) -> tuple[str, list[str]]:
 
 
 def _get_number_glyph_names(morpheme: str) -> tuple[str, list[str]]:
-
     if morpheme in READING_TO_GLYPH_NAME:
         return morpheme, READING_TO_GLYPH_NAME[morpheme]
     if morpheme.lower() in READING_TO_GLYPH_NAME:
@@ -476,26 +494,6 @@ def _get_number_glyph_names(morpheme: str) -> tuple[str, list[str]]:
 # --------------------------------------------------------------------------------------
 # ------------------------------- Glyphs -----------------------------------------------
 # --------------------------------------------------------------------------------------
-def _add_glyphs(df: pd.DataFrame) -> pd.DataFrame:
-    print()
-    print("Adding glyphs...")
-    df = df.progress_apply(_add_glyphs_to_row, axis=1)
-    print("Done!")
-    return df
-
-
-def _add_glyphs_to_row(row):
-    glyph_names = row["glyph_names"]
-    glyphs = ""
-    for glyph_name in glyph_names.split(" "):
-        if glyph_name == "":
-            continue
-        unicode = _glyph_name_to_unicode(glyph_name)
-        glyphs += unicode
-    row["glyphs"] = glyphs.strip()
-    return row
-
-
 def _glyph_name_to_unicode(glyph_name: str) -> str:
     if glyph_name in SPECIAL_TOKENS:
         return glyph_name
