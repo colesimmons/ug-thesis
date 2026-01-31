@@ -12,6 +12,12 @@ tqdm = "^4.66.2"
 sumeripy = {git = "https://github.com/colesimmons/sumeripy.git"}
 b2sdk = "^2.1.0"
 ipykernel = "^6.29.4"
+scikit-learn = "^1.4.2"
+datasets = "^2.19.1"
+huggingface-hub = "^0.23.0"
+pillow = "^10.3.0"
+openai = "^1.30.5"
+transformers = "^4.41.2"
 
 
 [build-system]

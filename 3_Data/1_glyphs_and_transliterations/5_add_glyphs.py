@@ -234,6 +234,8 @@ glyph_names_not_in_map = []
 glyph_names_no_unicode = []
 glyph_names_found_unicode = []
 
+glyph_to_observed_readings = {}
+
 
 # --------------------------------------------------------------------------------------
 # ------------------------------- Main  ------------------------------------------------
@@ -292,6 +294,7 @@ def main():
 
     _print_glyph_count(df)
     _write(df, separate_genre_files=True)
+    _save_glyph_to_observed_readings()
 
 
 def _add_glyphs(df: pd.DataFrame) -> pd.DataFrame:
@@ -326,6 +329,16 @@ def _add_glyphs_to_row(row: pd.Series) -> pd.Series:
         transliteration += "-".join([morpheme for morpheme, _, _ in data]) + " "
         glyph_names += " ".join([glyph_name for _, glyph_name, _ in data]) + " "
         glyphs += "".join([glyph for _, _, glyph in data]) + " "
+
+        # Record observed readings
+        for item in data:
+            morpheme, _, glyph = item
+            if morpheme in SPECIAL_TOKENS:
+                continue
+            # morpheme_ = morpheme.replace("{", "").replace("}", "")
+            if glyph not in glyph_to_observed_readings:
+                glyph_to_observed_readings[glyph] = Counter()
+            glyph_to_observed_readings[glyph][morpheme] += 1
 
     row["transliteration"] = transliteration.strip()
     row["glyph_names"] = glyph_names.strip()
@@ -619,6 +632,13 @@ def _write(df: pd.DataFrame, separate_genre_files=False):
 
     print(f"Writing to {OUTFILE}...")
     df.to_csv(OUTFILE, index=False, encoding="utf-8")
+
+
+def _save_glyph_to_observed_readings():
+    with open(
+        f"{OUTPUT_DIR}/glyph_to_observed_readings.json", "w", encoding="utf-8"
+    ) as outfile:
+        json.dump(glyph_to_observed_readings, outfile, indent=2, ensure_ascii=False)
 
 
 if __name__ == "__main__":

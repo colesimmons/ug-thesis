@@ -60,8 +60,59 @@ df = pd.DataFrame(tablets)
 df.to_csv("cdli.csv", index=False)
 
 
+SPECIAL_TOKS_TO_REMOVE = {
+    "<SURFACE>",
+    "<COLUMN>",
+    "<RULING>",
+    "<BLANK_SPACE>",
+}
+
+
+def _rm_special_tokens(text):
+    text_ = text
+    for tok in SPECIAL_TOKS_TO_REMOVE:
+        text_ = text_.replace(tok, "")
+    return text_
+
+
 def count_in_common_with_epsd2():
     # 2191 of 3656
+    cdli_df = pd.read_csv("cdli.csv", encoding="utf-8")
+    # Rename the "id" column to "name" to match the column name in cdli.csv
+    cdli_df = cdli_df[["name", "translation"]]
+    cdli_df = cdli_df.rename(columns={"name": "id"})
+    print("Before dropping duplicates:", cdli_df.shape)
+    cdli_df = cdli_df.drop_duplicates(subset=["id"])
+    print("After dropping duplicates:", cdli_df.shape)
+
+    train_df = pd.read_csv(
+        "../1_glyphs_and_transliterations/outputs/train.csv", encoding="utf-8"
+    )
+    test_df = pd.read_csv(
+        "../1_glyphs_and_transliterations/outputs/test.csv", encoding="utf-8"
+    )
+    val_df = pd.read_csv(
+        "../1_glyphs_and_transliterations/outputs/validation.csv", encoding="utf-8"
+    )
+
+    for split, df_ in [
+        ("train", train_df),
+        ("test", test_df),
+        ("validation", val_df),
+    ]:
+        joined = pd.merge(cdli_df, df_, on="id", how="inner")
+        joined = joined[
+            [
+                "id",
+                "period",
+                "genre",
+                "transliteration",
+                "translation",
+            ]
+        ]
+        joined["transliteration"] = joined["transliteration"].apply(_rm_special_tokens)
+        joined.to_csv(f"{split}.csv", index=False, encoding="utf-8")
+    return
 
     # Read the IDs from cdli.csv
     with open("cdli.csv", "r") as cdli_file:
@@ -69,7 +120,9 @@ def count_in_common_with_epsd2():
         cdli_ids = [row["id"] for row in cdli_reader]
 
     # Read the IDs from tablets.csv
-    with open("2_tablets.csv", "r") as tablets_file:
+    with open(
+        "../1_glyphs_and_transliterations/outputs/5_with_glyphs.csv", "r"
+    ) as tablets_file:
         tablets_reader = csv.DictReader(tablets_file)
         tablets_ids = [row["id"] for row in tablets_reader]
 
@@ -79,3 +132,6 @@ def count_in_common_with_epsd2():
     # Print the count
     print(f"Number of IDs from cdli.csv present in tablets.csv: {count}")
     print(len(cdli_ids))
+
+
+count_in_common_with_epsd2()

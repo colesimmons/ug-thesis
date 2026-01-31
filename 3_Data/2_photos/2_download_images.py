@@ -9,7 +9,7 @@ output_dir = "photos/"
 os.makedirs(output_dir, exist_ok=True)
 
 df = pd.read_csv(csv_file)
-df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+df = df.sample(frac=1).reset_index(drop=True)
 
 for _, row in df.iterrows():
     image_path = row["path"]

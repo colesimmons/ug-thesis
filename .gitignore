@@ -6,7 +6,7 @@
 3_Data/**/*.csv
 3_Data/**/*.zip
 3_Data/**/.corpusdata/
-3_Data/**/1_corpora/
+3_Data/**/outputs/
 
 
 # Byte-compiled / optimized / DLL files
